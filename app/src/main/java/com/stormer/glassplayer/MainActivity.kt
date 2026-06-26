@@ -155,7 +155,7 @@ class MainActivity : AppCompatActivity() {
 
     // ── Tab switching ─────────────────────────────────────────────────────────
     private fun setupControls() {
-        binding.btnPickFile.setOnClickListener { filePicker.launch(arrayOf("video/*")) }
+        binding.btnPickFile.setOnClickListener { showLibrary() }
         binding.btnPlayPause.setOnClickListener {
             player?.let { if (it.isPlaying) it.pause() else it.play(); updatePlayPause(it.isPlaying) }
         }
@@ -377,6 +377,57 @@ class MainActivity : AppCompatActivity() {
 
         // Recent files button
         binding.btnRecents.setOnClickListener { showRecentsDialog() }
+    }
+
+    // ── In-app video library browser (defaults to Movies folder) ───────────────
+    private var libraryCache: List<VideoItem> = emptyList()
+
+    private fun showLibrary() {
+        // Need read permission for the media library; if missing, request and fall back this time
+        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            android.Manifest.permission.READ_MEDIA_VIDEO
+        else android.Manifest.permission.READ_EXTERNAL_STORAGE
+        if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(perm), 100)
+            filePicker.launch(arrayOf("video/*"))
+            return
+        }
+
+        libraryCache = VideoLibrary.queryAll(this)
+        if (libraryCache.isEmpty()) {
+            // Nothing indexed — use the system picker instead
+            filePicker.launch(arrayOf("video/*"))
+            return
+        }
+        val folders = VideoLibrary.folders(libraryCache)
+        val defaultFolder = folders.firstOrNull { it.equals("Movies", true) } ?: folders.first()
+        showFolderVideos(defaultFolder, folders)
+    }
+
+    private fun showFolderVideos(folder: String, folders: List<String>) {
+        val vids = libraryCache.filter { it.folder == folder }
+        val labels = vids.map { v ->
+            if (v.durationMs > 0) "${v.name}\n   ${formatTime(v.durationMs)}" else v.name
+        }.toTypedArray()
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("📁 $folder")
+            .setItems(labels) { _, which -> loadVideo(vids[which].uri) }
+            .setNeutralButton("Other folders…") { _, _ -> showFolderPicker(folders) }
+            .setNegativeButton("System picker…") { _, _ -> filePicker.launch(arrayOf("video/*")) }
+            .show()
+    }
+
+    private fun showFolderPicker(folders: List<String>) {
+        val labels = folders.map { f ->
+            val count = libraryCache.count { it.folder == f }
+            "$f  ($count)"
+        }.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Choose folder")
+            .setItems(labels) { _, which -> showFolderVideos(folders[which], folders) }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun showRecentsDialog() {
