@@ -1,8 +1,16 @@
 package com.stormer.glassplayer
 
 import android.media.audiofx.*
+import android.util.Log
 
+/**
+ * All effect calls are wrapped in runCatching so a device rejecting an effect
+ * or a value can never crash the app — the effect just stays inactive.
+ * EQ band levels are clamped to the device's real reported range.
+ */
 class AudioEffectsManager(private val audioSessionId: Int) {
+
+    companion object { private const val TAG = "AudioFx" }
 
     var loudnessEnhancer: LoudnessEnhancer? = null
     var equalizer: Equalizer? = null
@@ -10,93 +18,85 @@ class AudioEffectsManager(private val audioSessionId: Int) {
     var virtualizer: Virtualizer? = null
     var presetReverb: PresetReverb? = null
 
-    // State
     var boostGain: Int = 500
-    var bassStrength: Int = 500
-    var virtualizerStrength: Int = 500
+    var bassStrength: Int = 0
+    var virtualizerStrength: Int = 0
     var reverbPreset: Short = PresetReverb.PRESET_NONE
     var eqBands: IntArray = IntArray(5) { 0 }
     var vocalsBoostActive: Boolean = false
 
+    private var eqMin = -1500
+    private var eqMax = 1500
+    private var eqNumBands = 5
+
     fun init() {
-        runCatching { loudnessEnhancer = LoudnessEnhancer(audioSessionId).apply { enabled = true; setTargetGain(boostGain) } }
-        runCatching {
-            equalizer = Equalizer(0, audioSessionId).apply {
+        loudnessEnhancer = safe("LoudnessEnhancer") { LoudnessEnhancer(audioSessionId).apply { enabled = true; setTargetGain(boostGain) } }
+        equalizer = safe("Equalizer") {
+            Equalizer(0, audioSessionId).apply {
                 enabled = true
-                val numBands = numberOfBands.toInt()
-                eqBands = IntArray(numBands) { 0 }
+                eqNumBands = numberOfBands.toInt()
+                val r = bandLevelRange
+                eqMin = r[0].toInt(); eqMax = r[1].toInt()
+                eqBands = IntArray(eqNumBands) { 0 }
             }
         }
-        runCatching { bassBoost = BassBoost(0, audioSessionId).apply { enabled = true; setStrength(bassStrength.toShort()) } }
-        runCatching { virtualizer = Virtualizer(0, audioSessionId).apply { enabled = true; setStrength(virtualizerStrength.toShort()) } }
-        runCatching { presetReverb = PresetReverb(0, audioSessionId).apply { enabled = false; preset = PresetReverb.PRESET_NONE } }
+        bassBoost = safe("BassBoost") { BassBoost(0, audioSessionId).apply { enabled = true } }
+        virtualizer = safe("Virtualizer") { Virtualizer(0, audioSessionId).apply { enabled = true } }
+        presetReverb = safe("PresetReverb") { PresetReverb(0, audioSessionId).apply { enabled = false } }
     }
 
-    fun setBoost(gain: Int) {
+    private fun <T> safe(name: String, block: () -> T): T? = try { block() } catch (e: Throwable) {
+        Log.w(TAG, "create $name failed: ${e.message}"); null
+    }
+
+    fun setBoost(gain: Int) = runCatching {
         boostGain = gain
-        loudnessEnhancer?.setTargetGain(gain)
-    }
+        loudnessEnhancer?.setTargetGain(gain.coerceIn(0, 2000))
+    }.onFailure { Log.w(TAG, "setBoost: ${it.message}") }.let {}
 
-    fun setBass(strength: Int) {
+    fun setBass(strength: Int) = runCatching {
         bassStrength = strength
-        bassBoost?.setStrength(strength.toShort())
-    }
+        bassBoost?.takeIf { it.strengthSupported }?.setStrength(strength.coerceIn(0, 1000).toShort())
+    }.onFailure { Log.w(TAG, "setBass: ${it.message}") }.let {}
 
-    fun setVirtualizer(strength: Int) {
+    fun setVirtualizer(strength: Int) = runCatching {
         virtualizerStrength = strength
-        virtualizer?.setStrength(strength.toShort())
-    }
+        virtualizer?.takeIf { it.strengthSupported }?.setStrength(strength.coerceIn(0, 1000).toShort())
+    }.onFailure { Log.w(TAG, "setVirtualizer: ${it.message}") }.let {}
 
-    fun setReverb(preset: Short) {
+    fun setReverb(preset: Short) = runCatching {
         reverbPreset = preset
         presetReverb?.apply {
-            if (preset == PresetReverb.PRESET_NONE) {
-                enabled = false
-            } else {
-                enabled = true
-                this.preset = preset
-            }
+            if (preset == PresetReverb.PRESET_NONE) enabled = false
+            else { this.preset = preset; enabled = true }
         }
-    }
+    }.onFailure { Log.w(TAG, "setReverb: ${it.message}") }.let {}
 
-    fun setEqBand(band: Int, levelMb: Int) {
-        eqBands[band] = levelMb
-        equalizer?.setBandLevel(band.toShort(), levelMb.toShort())
-    }
+    fun setEqBand(band: Int, levelMb: Int) = runCatching {
+        if (band < eqBands.size) eqBands[band] = levelMb
+        equalizer?.setBandLevel(band.toShort(), levelMb.coerceIn(eqMin, eqMax).toShort())
+    }.onFailure { Log.w(TAG, "setEqBand: ${it.message}") }.let {}
 
-    fun applyVocalBoost(active: Boolean) {
+    fun applyVocalBoost(active: Boolean) = runCatching {
         vocalsBoostActive = active
-        equalizer?.let { eq ->
-            val numBands = eq.numberOfBands.toInt()
-            // Vocal range: bands 2 and 3 (approx 910Hz and 3.6kHz)
-            if (active) {
-                if (numBands > 2) eq.setBandLevel(2, (eqBands.getOrElse(2) { 0 } + 600).coerceIn(-1500, 1500).toShort())
-                if (numBands > 3) eq.setBandLevel(3, (eqBands.getOrElse(3) { 0 } + 400).coerceIn(-1500, 1500).toShort())
-            } else {
-                if (numBands > 2) eq.setBandLevel(2, eqBands.getOrElse(2) { 0 }.toShort())
-                if (numBands > 3) eq.setBandLevel(3, eqBands.getOrElse(3) { 0 }.toShort())
-            }
+        val eq = equalizer ?: return@runCatching
+        if (active) {
+            if (eqNumBands > 2) eq.setBandLevel(2, (eqBands.getOrElse(2){0} + 600).coerceIn(eqMin, eqMax).toShort())
+            if (eqNumBands > 3) eq.setBandLevel(3, (eqBands.getOrElse(3){0} + 400).coerceIn(eqMin, eqMax).toShort())
+        } else {
+            if (eqNumBands > 2) eq.setBandLevel(2, eqBands.getOrElse(2){0}.coerceIn(eqMin, eqMax).toShort())
+            if (eqNumBands > 3) eq.setBandLevel(3, eqBands.getOrElse(3){0}.coerceIn(eqMin, eqMax).toShort())
         }
-    }
+    }.onFailure { Log.w(TAG, "vocalBoost: ${it.message}") }.let {}
 
-    fun applyPreset(preset: EqPreset) {
-        val levels = preset.levels
-        equalizer?.let { eq ->
-            val numBands = minOf(eq.numberOfBands.toInt(), levels.size)
-            for (i in 0 until numBands) {
-                eqBands[i] = levels[i]
-                eq.setBandLevel(i.toShort(), levels[i].toShort())
-            }
+    fun applyPreset(preset: EqPreset) = runCatching {
+        val eq = equalizer ?: return@runCatching
+        val n = minOf(eqNumBands, preset.levels.size)
+        for (i in 0 until n) {
+            eqBands[i] = preset.levels[i]
+            eq.setBandLevel(i.toShort(), preset.levels[i].coerceIn(eqMin, eqMax).toShort())
         }
-    }
-
-    fun getEqBandFrequencies(): List<String> {
-        val eq = equalizer ?: return listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
-        return (0 until eq.numberOfBands.toInt()).map { band ->
-            val hz = eq.getCenterFreq(band.toShort()) / 1000
-            if (hz >= 1000) "${hz / 1000}kHz" else "${hz}Hz"
-        }
-    }
+    }.onFailure { Log.w(TAG, "applyPreset: ${it.message}") }.let {}
 
     fun release() {
         runCatching { loudnessEnhancer?.release() }
