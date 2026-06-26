@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A1628">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="center_vertical">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GLASS PLAYER PRO"
+                android:textColor="#00AEEF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.12"/>
+
+            <TextView
+                android:id="@+id/tvGlassStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#58595B"
+                android:textSize="12sp"/>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnPickFile"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="📂 Open"
+            android:backgroundTint="#00AEEF"
+            android:textColor="#0A1628"
+            android:textStyle="bold"
+            android:paddingHorizontal="16dp"/>
+    </LinearLayout>
+
+    <!-- File name -->
+    <TextView
+        android:id="@+id/tvFileName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="No file selected"
+        android:textColor="#445566"
+        android:textSize="12sp"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp"
+        android:maxLines="1"
+        android:ellipsize="middle"/>
+
+    <!-- Seek bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvPos"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0:00"
+            android:textColor="#8899AA"
+            android:textSize="11sp"
+            android:minWidth="40dp"/>
+
+        <SeekBar
+            android:id="@+id/seekBar"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="1000"
+            android:progressTint="#00AEEF"
+            android:thumbTint="#00AEEF"
+            android:layout_marginHorizontal="8dp"/>
+
+        <TextView
+            android:id="@+id/tvDur"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0:00"
+            android:textColor="#8899AA"
+            android:textSize="11sp"
+            android:minWidth="40dp"
+            android:gravity="end"/>
+    </LinearLayout>
+
+    <!-- Transport controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:padding="8dp">
+
+        <Button
+            android:id="@+id/btnRewind"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="⏮ 10s"
+            android:backgroundTint="#1A2A3A"
+            android:textColor="#00AEEF"
+            android:layout_marginEnd="6dp"/>
+
+        <Button
+            android:id="@+id/btnPlayPause"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1.2"
+            android:text="▶"
+            android:backgroundTint="#00AEEF"
+            android:textColor="#0A1628"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:layout_marginEnd="6dp"/>
+
+        <Button
+            android:id="@+id/btnForward"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:text="10s ⏭"
+            android:backgroundTint="#1A2A3A"
+            android:textColor="#00AEEF"/>
+    </LinearLayout>
+
+    <!-- Tab bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:background="#0D1E32"
+        android:layout_marginTop="4dp">
+
+        <TextView
+            android:id="@+id/tabAudio"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="🎚️  AUDIO"
+            android:textColor="#00AEEF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:letterSpacing="0.08"/>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="#1A2A3A"/>
+
+        <TextView
+            android:id="@+id/tabVideo"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:text="📺  VIDEO"
+            android:textColor="#00AEEF"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:letterSpacing="0.08"/>
+    </LinearLayout>
+
+    <!-- Scrollable panels -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <!-- ═══════════════ AUDIO PANEL ═══════════════ -->
+        <LinearLayout
+            android:id="@+id/panelAudio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Loudness boost -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="LOUDNESS BOOST" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="4dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                <SeekBar android:id="@+id/seekBoost" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvBoostVal" android:layout_width="56dp" android:layout_height="wrap_content" android:textColor="#CCDDEE" android:textSize="12sp" android:gravity="end"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginVertical="12dp"/>
+
+            <!-- Bass boost -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="BASS BOOST" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="4dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                <SeekBar android:id="@+id/seekBass" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvBassVal" android:layout_width="56dp" android:layout_height="wrap_content" android:textColor="#CCDDEE" android:textSize="12sp" android:gravity="end"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginVertical="12dp"/>
+
+            <!-- Virtualizer / Surround -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="SURROUND / VIRTUALIZER" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="4dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                <SeekBar android:id="@+id/seekVirt" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvVirtVal" android:layout_width="56dp" android:layout_height="wrap_content" android:textColor="#CCDDEE" android:textSize="12sp" android:gravity="end"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginVertical="12dp"/>
+
+            <!-- Vocal boost -->
+            <Button
+                android:id="@+id/btnVocals"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="🎤 Vocals OFF"
+                android:backgroundTint="#1A2A3A"
+                android:textColor="#00AEEF"
+                android:alpha="0.4"
+                android:layout_marginBottom="12dp"/>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginBottom="12dp"/>
+
+            <!-- EQ Preset -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="EQ PRESET" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="6dp"/>
+            <Spinner
+                android:id="@+id/spinnerEqPreset"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_pill"
+                android:popupBackground="#0D1E32"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- EQ Bands -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="EQUALISER" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="8dp"/>
+
+            <!-- Band 0 -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="60Hz" android:textColor="#8899AA" android:textSize="11sp"/>
+                <SeekBar android:id="@+id/seekEq0" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvEq0" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#CCDDEE" android:textSize="11sp" android:gravity="end"/>
+            </LinearLayout>
+            <!-- Band 1 -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="230Hz" android:textColor="#8899AA" android:textSize="11sp"/>
+                <SeekBar android:id="@+id/seekEq1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvEq1" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#CCDDEE" android:textSize="11sp" android:gravity="end"/>
+            </LinearLayout>
+            <!-- Band 2 -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="910Hz" android:textColor="#8899AA" android:textSize="11sp"/>
+                <SeekBar android:id="@+id/seekEq2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvEq2" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#CCDDEE" android:textSize="11sp" android:gravity="end"/>
+            </LinearLayout>
+            <!-- Band 3 -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="3.6kHz" android:textColor="#8899AA" android:textSize="11sp"/>
+                <SeekBar android:id="@+id/seekEq3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvEq3" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#CCDDEE" android:textSize="11sp" android:gravity="end"/>
+            </LinearLayout>
+            <!-- Band 4 -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
+                <TextView android:layout_width="44dp" android:layout_height="wrap_content" android:text="14kHz" android:textColor="#8899AA" android:textSize="11sp"/>
+                <SeekBar android:id="@+id/seekEq4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:progressTint="#00AEEF" android:thumbTint="#00AEEF"/>
+                <TextView android:id="@+id/tvEq4" android:layout_width="40dp" android:layout_height="wrap_content" android:text="0" android:textColor="#CCDDEE" android:textSize="11sp" android:gravity="end"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginVertical="12dp"/>
+
+            <!-- Reverb -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="REVERB / SPACE" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="6dp"/>
+            <Spinner
+                android:id="@+id/spinnerReverb"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_pill"
+                android:popupBackground="#0D1E32"
+                android:layout_marginBottom="16dp"/>
+
+        </LinearLayout>
+
+        <!-- ═══════════════ VIDEO PANEL ═══════════════ -->
+        <LinearLayout
+            android:id="@+id/panelVideo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+
+            <!-- Zoom mode -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="ZOOM MODE" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="8dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="16dp">
+                <Button android:id="@+id/btnZoomFit" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="Fit" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginEnd="6dp"/>
+                <Button android:id="@+id/btnZoomFill" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="Fill" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginEnd="6dp"/>
+                <Button android:id="@+id/btnZoomStretch" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="Stretch" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginBottom="12dp"/>
+
+            <!-- Aspect ratio -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="ASPECT RATIO" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="8dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="16dp">
+                <Button android:id="@+id/btnAuto" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="Auto" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+                <Button android:id="@+id/btn169" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="16:9" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+                <Button android:id="@+id/btn43" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="4:3" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+                <Button android:id="@+id/btn219" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+                    android:text="21:9" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#1A2A3A" android:layout_marginBottom="12dp"/>
+
+            <!-- 3D SBS mode -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="3D MODE (Side-by-Side)" android:textColor="#00AEEF" android:textSize="11sp"
+                android:textStyle="bold" android:letterSpacing="0.1" android:layout_marginBottom="4dp"/>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="Use SBS Full for standard 3D MKV/MP4 files. Use SBS Half for half-width encoded files."
+                android:textColor="#445566" android:textSize="11sp" android:layout_marginBottom="8dp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginBottom="16dp">
+                <Button android:id="@+id/btnSbsOff" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="Normal (2D)" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnSbsFull" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D SBS Full — L|R" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnSbsFullSwap" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D SBS Full — R|L  (swap eyes)" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnSbsHalf" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D SBS Half — L|R" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnSbsHalfSwap" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D SBS Half — R|L  (swap eyes)" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF"/>
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

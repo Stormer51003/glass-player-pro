@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Normal playback (non-swap SBS modes) -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/glassPlayerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"/>
+
+    <!-- Hidden TextureView: player renders here when swap mode is active.
+         Positioned off-screen (1x1 at bottom-right corner) so it doesn't
+         interfere with the display but still receives decoded frames. -->
+    <TextureView
+        android:id="@+id/hiddenTexture"
+        android:layout_width="1px"
+        android:layout_height="1px"
+        android:layout_gravity="bottom|end"
+        android:alpha="0"/>
+
+    <!-- Swap overlay: reads hiddenTexture bitmap each vsync, draws halves swapped -->
+    <com.stormer.glassplayer.SwapSurfaceView
+        android:id="@+id/swapOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"/>
+
+</FrameLayout>
