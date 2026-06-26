@@ -38,6 +38,16 @@ class MainActivity : AppCompatActivity() {
     private var currentAspect = AspectRatio.AUTO
     private var currentSbs = SbsMode.OFF
 
+    // Batch A state
+    private lateinit var prefs: Prefs
+    private var currentUri: String? = null
+    private var playbackSpeed = 1.0f
+    private var sleepTimerRunnable: Runnable? = null
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var abPointA = -1L
+    private var abPointB = -1L
+    private lateinit var sbsButtonMap: List<Pair<Button, SbsMode>>
+
     // ── Display listener ────────────────────────────────────────────────────
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {
@@ -54,8 +64,15 @@ class MainActivity : AppCompatActivity() {
         override fun onDisplayChanged(displayId: Int) {}
     }
 
-    private val filePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let { loadVideo(it) }
+    private val filePicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            runCatching {
+                contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            loadVideo(it)
+        }
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -83,6 +100,7 @@ class MainActivity : AppCompatActivity() {
             binding = ActivityMainBinding.inflate(layoutInflater)
             setContentView(binding.root)
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            prefs = Prefs(this)
 
             displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -90,6 +108,7 @@ class MainActivity : AppCompatActivity() {
             setupControls()
             setupAudioTab()
             setupVideoTab()
+            setupPlaybackExtras()
             requestPermissions()
 
             val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
@@ -114,8 +133,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleIntent(intent) }
 
+    override fun onPause() {
+        super.onPause()
+        saveCurrentPosition()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        saveCurrentPosition()
+        sleepTimerRunnable?.let { uiHandler.removeCallbacks(it) }
         if (::binding.isInitialized) {
             progressRunnable?.let { binding.seekBar.removeCallbacks(it) }
         }
@@ -129,7 +155,7 @@ class MainActivity : AppCompatActivity() {
 
     // ── Tab switching ─────────────────────────────────────────────────────────
     private fun setupControls() {
-        binding.btnPickFile.setOnClickListener { filePicker.launch("video/*") }
+        binding.btnPickFile.setOnClickListener { filePicker.launch(arrayOf("video/*")) }
         binding.btnPlayPause.setOnClickListener {
             player?.let { if (it.isPlaying) it.pause() else it.play(); updatePlayPause(it.isPlaying) }
         }
@@ -269,23 +295,107 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnAuto.alpha = 1f
 
-        // SBS mode buttons
-        val sbsBtns = listOf(
+        // SBS / OU mode buttons
+        sbsButtonMap = listOf(
             binding.btnSbsOff      to SbsMode.OFF,
             binding.btnSbsFull     to SbsMode.SBS_FULL,
             binding.btnSbsFullSwap to SbsMode.SBS_FULL_SWAP,
             binding.btnSbsHalf     to SbsMode.SBS_HALF,
-            binding.btnSbsHalfSwap to SbsMode.SBS_HALF_SWAP
+            binding.btnSbsHalfSwap to SbsMode.SBS_HALF_SWAP,
+            binding.btnOuFull      to SbsMode.OU_FULL,
+            binding.btnOuHalf      to SbsMode.OU_HALF
         )
-        sbsBtns.forEach { (btn, mode) ->
+        sbsButtonMap.forEach { (btn, mode) ->
             btn.setOnClickListener {
                 currentSbs = mode
                 applyVideoSettings()
-                sbsBtns.forEach { (b, _) -> b.alpha = 0.4f }
-                btn.alpha = 1f
+                highlightSbsButton(mode)
             }
         }
-        binding.btnSbsOff.alpha = 1f
+        highlightSbsButton(SbsMode.OFF)
+    }
+
+    private fun highlightSbsButton(active: SbsMode) {
+        sbsButtonMap.forEach { (b, m) -> b.alpha = if (m == active) 1f else 0.4f }
+    }
+
+    // ── Batch A: speed, sleep timer, A-B repeat, recents ───────────────────────
+    private fun setupPlaybackExtras() {
+        // Playback speed cycle button: 0.5 → 0.75 → 1.0 → 1.25 → 1.5 → 2.0
+        val speeds = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+        binding.btnSpeed.text = "1.0×"
+        binding.btnSpeed.setOnClickListener {
+            val idx = speeds.indexOf(playbackSpeed).let { if (it < 0) 2 else it }
+            playbackSpeed = speeds[(idx + 1) % speeds.size]
+            binding.btnSpeed.text = "${playbackSpeed}×"
+            runCatching { player?.setPlaybackSpeed(playbackSpeed) }
+        }
+
+        // Sleep timer cycle: Off → 15 → 30 → 45 → 60 min
+        val timers = listOf(0, 15, 30, 45, 60)
+        var timerIdx = 0
+        binding.btnSleep.text = "💤 Off"
+        binding.btnSleep.setOnClickListener {
+            timerIdx = (timerIdx + 1) % timers.size
+            val mins = timers[timerIdx]
+            sleepTimerRunnable?.let { uiHandler.removeCallbacks(it) }
+            if (mins == 0) {
+                binding.btnSleep.text = "💤 Off"
+            } else {
+                binding.btnSleep.text = "💤 ${mins}m"
+                sleepTimerRunnable = Runnable {
+                    runCatching { player?.pause() }
+                    binding.btnSleep.text = "💤 Off"
+                    timerIdx = 0
+                }
+                uiHandler.postDelayed(sleepTimerRunnable!!, mins * 60_000L)
+            }
+        }
+
+        // A-B repeat: first tap sets A, second sets B, third clears
+        binding.btnAbRepeat.text = "A-B"
+        binding.btnAbRepeat.setOnClickListener {
+            val p = player ?: return@setOnClickListener
+            when {
+                abPointA < 0 -> {
+                    abPointA = p.currentPosition
+                    binding.btnAbRepeat.text = "A●—B"
+                }
+                abPointB < 0 -> {
+                    abPointB = p.currentPosition
+                    if (abPointB <= abPointA) { // B before A — swap
+                        val t = abPointA; abPointA = abPointB; abPointB = t
+                    }
+                    binding.btnAbRepeat.text = "A—B●"
+                }
+                else -> {
+                    abPointA = -1L; abPointB = -1L
+                    binding.btnAbRepeat.text = "A-B"
+                }
+            }
+        }
+
+        // Recent files button
+        binding.btnRecents.setOnClickListener { showRecentsDialog() }
+    }
+
+    private fun showRecentsDialog() {
+        val recents = runCatching { prefs.getRecents() }.getOrDefault(emptyList())
+        if (recents.isEmpty()) {
+            Toast.makeText(this, "No recent files yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = recents.map { it.second }.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Recent files")
+            .setItems(names) { _, which ->
+                val uriStr = recents[which].first
+                runCatching { loadVideo(Uri.parse(uriStr)) }
+                    .onFailure { Toast.makeText(this, "Couldn't open — file may have moved", Toast.LENGTH_SHORT).show() }
+            }
+            .setNegativeButton("Clear list") { _, _ -> prefs.clearRecents() }
+            .setPositiveButton("Cancel", null)
+            .show()
     }
 
     private fun applyVideoSettings() {
@@ -298,12 +408,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadVideo(uri: Uri) {
+        // Save position of the outgoing file before tearing down
+        saveCurrentPosition()
+
         audioFx?.release()
         player?.release()
         glassPresentation?.dismiss()
         glassPresentation = null
 
-        binding.tvFileName.text = getFileName(uri)
+        val fileName = getFileName(uri)
+        binding.tvFileName.text = fileName
+        currentUri = uri.toString()
+
+        // Record in recents
+        runCatching { prefs.addRecent(uri.toString(), fileName) }
+
+        // Auto-detect 3D layout from filename (only if user hasn't manually set one)
+        val detected = ThreeDDetector.detect(fileName)
+        if (detected != SbsMode.OFF) {
+            currentSbs = detected
+            runOnUiThread { highlightSbsButton(detected) }
+        }
 
         val newPlayer = ExoPlayer.Builder(this).build()
         player = newPlayer
@@ -327,10 +452,27 @@ class MainActivity : AppCompatActivity() {
 
         newPlayer.setMediaItem(MediaItem.fromUri(uri))
         newPlayer.prepare()
+        newPlayer.setPlaybackSpeed(playbackSpeed)
+
+        // Resume from saved position if we have one (and it's not basically the end)
+        val saved = prefs.getPosition(uri.toString())
+        if (saved > 3000) newPlayer.seekTo(saved)
+
         newPlayer.play()
 
         val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
         if (displays.isNotEmpty()) showOnGlass(newPlayer, displays[0])
+    }
+
+    private fun saveCurrentPosition() {
+        if (!::prefs.isInitialized) return
+        val p = player ?: return
+        val u = currentUri ?: return
+        runCatching {
+            val pos = p.currentPosition
+            if (pos > 0 && p.duration > 0 && pos < p.duration - 5000) prefs.savePosition(u, pos)
+            else prefs.savePosition(u, 0L) // finished — clear resume
+        }
     }
 
     private fun showOnGlass(player: ExoPlayer, display: Display) {
@@ -351,6 +493,10 @@ class MainActivity : AppCompatActivity() {
                         binding.seekBar.progress = (p.currentPosition * 1000 / p.duration).toInt()
                         binding.tvPos.text = formatTime(p.currentPosition)
                         binding.tvDur.text = formatTime(p.duration)
+                    }
+                    // A-B repeat: jump back to A once we pass B
+                    if (abPointA in 0 until abPointB && p.currentPosition >= abPointB) {
+                        p.seekTo(abPointA)
                     }
                 }
                 binding.seekBar.postDelayed(this, 500)
@@ -459,6 +605,8 @@ class GlassPresentation(
                 }
                 SbsMode.SBS_FULL -> pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 SbsMode.SBS_HALF -> pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                SbsMode.OU_FULL -> pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                SbsMode.OU_HALF -> pv.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_HEIGHT
                 else -> {}
             }
         }

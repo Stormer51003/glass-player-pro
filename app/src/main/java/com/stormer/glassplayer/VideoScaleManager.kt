@@ -21,10 +21,28 @@ enum class AspectRatio(val label: String, val ratio: Float) {
     RATIO_1_1("1:1", 1f);
 }
 
-enum class SbsMode(val label: String, val swap: Boolean = false) {
+enum class SbsMode(val label: String, val swap: Boolean = false, val vertical: Boolean = false) {
     OFF("Normal"),
     SBS_FULL("3D SBS Full — L|R"),
     SBS_FULL_SWAP("3D SBS Full — R|L (swapped)", swap = true),
     SBS_HALF("3D SBS Half — L|R"),
-    SBS_HALF_SWAP("3D SBS Half — R|L (swapped)", swap = true);
+    SBS_HALF_SWAP("3D SBS Half — R|L (swapped)", swap = true),
+    OU_FULL("3D Over/Under — T|B", vertical = true),
+    OU_HALF("3D Over/Under Half — T|B", vertical = true);
+}
+
+/** Guesses a 3D mode from the filename. Returns OFF if nothing matches. */
+object ThreeDDetector {
+    fun detect(name: String): SbsMode {
+        val n = name.lowercase()
+        val isHalf = n.contains("half") || n.contains("hsbs") || n.contains("hou")
+        return when {
+            n.contains("ou") || n.contains("over-under") || n.contains("overunder") ||
+                n.contains("tab") || n.contains("top-bottom") ->
+                if (isHalf) SbsMode.OU_HALF else SbsMode.OU_FULL
+            n.contains("sbs") || n.contains("3d") || n.contains("half-sbs") ->
+                if (isHalf) SbsMode.SBS_HALF else SbsMode.SBS_FULL
+            else -> SbsMode.OFF
+        }
+    }
 }

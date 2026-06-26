@@ -138,6 +138,29 @@
             android:textColor="#00AEEF"/>
     </LinearLayout>
 
+    <!-- Extra controls: speed, sleep, A-B, recents -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingHorizontal="8dp"
+        android:paddingBottom="4dp">
+
+        <Button android:id="@+id/btnSpeed" android:layout_width="0dp" android:layout_height="40dp"
+            android:layout_weight="1" android:text="1.0×" android:textSize="12sp"
+            android:backgroundTint="#0D1E32" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btnSleep" android:layout_width="0dp" android:layout_height="40dp"
+            android:layout_weight="1" android:text="💤 Off" android:textSize="12sp"
+            android:backgroundTint="#0D1E32" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btnAbRepeat" android:layout_width="0dp" android:layout_height="40dp"
+            android:layout_weight="1" android:text="A-B" android:textSize="12sp"
+            android:backgroundTint="#0D1E32" android:textColor="#00AEEF" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btnRecents" android:layout_width="0dp" android:layout_height="40dp"
+            android:layout_weight="1" android:text="🕒" android:textSize="12sp"
+            android:backgroundTint="#0D1E32" android:textColor="#00AEEF"/>
+    </LinearLayout>
+
     <!-- Tab bar -->
     <LinearLayout
         android:layout_width="match_parent"
@@ -365,7 +388,11 @@
                 <Button android:id="@+id/btnSbsHalf" android:layout_width="match_parent" android:layout_height="44dp"
                     android:text="3D SBS Half — L|R" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
                 <Button android:id="@+id/btnSbsHalfSwap" android:layout_width="match_parent" android:layout_height="44dp"
-                    android:text="3D SBS Half — R|L  (swap eyes)" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF"/>
+                    android:text="3D SBS Half — R|L  (swap eyes)" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnOuFull" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D Over/Under — Top|Bottom" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF" android:layout_marginBottom="6dp"/>
+                <Button android:id="@+id/btnOuHalf" android:layout_width="match_parent" android:layout_height="44dp"
+                    android:text="3D Over/Under Half — Top|Bottom" android:backgroundTint="#1A2A3A" android:textColor="#00AEEF"/>
             </LinearLayout>
 
         </LinearLayout>
