@@ -116,8 +116,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        progressRunnable?.let { binding.seekBar.removeCallbacks(it) }
-        displayManager.unregisterDisplayListener(displayListener)
+        if (::binding.isInitialized) {
+            progressRunnable?.let { binding.seekBar.removeCallbacks(it) }
+        }
+        if (::displayManager.isInitialized) {
+            displayManager.unregisterDisplayListener(displayListener)
+        }
         audioFx?.release()
         player?.release()
         glassPresentation?.dismiss()
