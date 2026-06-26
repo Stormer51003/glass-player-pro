@@ -22,8 +22,8 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Regenerate Gradle wrapper
-        run: gradle wrapper --gradle-version 8.4 --distribution-type bin
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Cache Gradle packages
         uses: actions/cache@v4
