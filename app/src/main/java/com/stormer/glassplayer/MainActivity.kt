@@ -61,23 +61,55 @@ class MainActivity : AppCompatActivity() {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        // If the previous run crashed, show the stack trace instead of starting normally
+        val crashFile = java.io.File(filesDir, "last_crash.txt")
+        if (crashFile.exists()) {
+            val crashText = crashFile.readText()
+            crashFile.delete()
+            val tv = android.widget.TextView(this).apply {
+                text = crashText
+                setTextColor(0xFFFF5555.toInt())
+                setBackgroundColor(0xFF0A1628.toInt())
+                setPadding(32, 64, 32, 32)
+                textSize = 11f
+                setTextIsSelectable(true)
+            }
+            setContentView(android.widget.ScrollView(this).apply { addView(tv) })
+            return
+        }
 
-        setupControls()
-        setupAudioTab()
-        setupVideoTab()
-        requestPermissions()
+        try {
+            binding = ActivityMainBinding.inflate(layoutInflater)
+            setContentView(binding.root)
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-        updateGlassStatus(displays.isNotEmpty())
-        displayManager.registerDisplayListener(displayListener, null)
+            displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+            audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-        intent?.let { handleIntent(it) }
+            setupControls()
+            setupAudioTab()
+            setupVideoTab()
+            requestPermissions()
+
+            val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            updateGlassStatus(displays.isNotEmpty())
+            displayManager.registerDisplayListener(displayListener, null)
+
+            intent?.let { handleIntent(it) }
+        } catch (e: Exception) {
+            val sw = java.io.StringWriter()
+            e.printStackTrace(java.io.PrintWriter(sw))
+            val tv = android.widget.TextView(this).apply {
+                text = "Startup error:\n\n$sw"
+                setTextColor(0xFFFF5555.toInt())
+                setBackgroundColor(0xFF0A1628.toInt())
+                setPadding(32, 64, 32, 32)
+                textSize = 11f
+                setTextIsSelectable(true)
+            }
+            setContentView(android.widget.ScrollView(this).apply { addView(tv) })
+        }
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); handleIntent(intent) }
