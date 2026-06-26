@@ -401,22 +401,19 @@ class GlassPresentation(
 
         if (sbs.swap) {
             // Route player to hidden TextureView; SwapSurfaceView reads + redraws swapped
+            pv.player = null
             pv.visibility = View.INVISIBLE
             overlay.visibility = View.VISIBLE
             player.setVideoTextureView(hidden)
-            hidden.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> }
             // Kick off the swap draw loop
             overlay.startSwapping(hidden, sbs == SbsMode.SBS_HALF_SWAP)
         } else {
             overlay.visibility = View.GONE
             overlay.stopSwapping()
-            pv.visibility = View.VISIBLE
             player.clearVideoTextureView(hidden)
-            player.setVideoSurfaceView(
-                pv.findViewById(androidx.media3.ui.R.id.exo_content_frame)
-                    ?.let { (it as? android.widget.FrameLayout)?.getChildAt(0) as? android.view.SurfaceView }
-                    ?: return
-            )
+            pv.visibility = View.VISIBLE
+            // Reattaching the player to the PlayerView restores its managed surface
+            pv.player = player
 
             when (sbs) {
                 SbsMode.OFF -> {
