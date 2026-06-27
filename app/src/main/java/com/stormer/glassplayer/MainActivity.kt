@@ -17,6 +17,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.media3.common.*
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.stormer.glassplayer.databinding.ActivityMainBinding
@@ -48,6 +49,14 @@ class MainActivity : AppCompatActivity() {
     private var abPointB = -1L
     private lateinit var sbsButtonMap: List<Pair<Button, SbsMode>>
 
+    // Batch B state
+    private var trackSelector: androidx.media3.exoplayer.trackselection.DefaultTrackSelector? = null
+    private var glassBrightness = 1.0f   // 0.1..1.0 applied to glasses output
+    private var glassContrast = 1.0f     // 0.5..2.0 applied on swap canvas
+    private var ipdShiftPx = 0           // horizontal nudge for 3D eye separation
+    private var touchLocked = false
+    private lateinit var gestureDetector: GestureDetector
+
     // ── Display listener ────────────────────────────────────────────────────
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {
@@ -72,6 +81,16 @@ class MainActivity : AppCompatActivity() {
                 contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             loadVideo(it)
+        }
+    }
+
+    private var externalSubUri: Uri? = null
+    private val subPicker = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            runCatching { contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            applyExternalSubtitle(it)
         }
     }
 
@@ -109,6 +128,7 @@ class MainActivity : AppCompatActivity() {
             setupAudioTab()
             setupVideoTab()
             setupPlaybackExtras()
+            setupGlassTuning()
             requestPermissions()
 
             val displays = displayManager.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
@@ -319,6 +339,26 @@ class MainActivity : AppCompatActivity() {
         sbsButtonMap.forEach { (b, m) -> b.alpha = if (m == active) 1f else 0.4f }
     }
 
+    private fun setupGlassTuning() {
+        binding.btnTracks.setOnClickListener { showTracksDialog() }
+
+        // Brightness 0..100 → 0.1..1.0
+        binding.seekBrightness.onProgress { v ->
+            glassBrightness = (v / 100f).coerceIn(0.1f, 1.0f)
+            applyGlassTuning()
+        }
+        // Contrast 0..150 → 0.5..2.0 (50 = neutral 1.0)
+        binding.seekContrast.onProgress { v ->
+            glassContrast = (0.5f + v / 100f).coerceIn(0.5f, 2.0f)
+            applyGlassTuning()
+        }
+        // IPD 0..100 → -40..+40 px (50 = 0)
+        binding.seekIpd.onProgress { v ->
+            ipdShiftPx = ((v - 50) * 40 / 50)
+            applyGlassTuning()
+        }
+    }
+
     // ── Batch A: speed, sleep timer, A-B repeat, recents ───────────────────────
     private fun setupPlaybackExtras() {
         // Playback speed cycle button: 0.5 → 0.75 → 1.0 → 1.25 → 1.5 → 2.0
@@ -453,6 +493,98 @@ class MainActivity : AppCompatActivity() {
         glassPresentation?.applyVideoSettings(currentZoom, currentAspect, currentSbs)
     }
 
+    // ── Subtitles & track switching ─────────────────────────────────────────────
+    private fun buildMediaItemWithSubs(uri: Uri, fileName: String): MediaItem {
+        val builder = MediaItem.Builder().setUri(uri)
+        externalSubUri?.let { sub ->
+            val mime = when {
+                sub.toString().lowercase().endsWith(".ass") ||
+                    sub.toString().lowercase().endsWith(".ssa") -> MimeTypes.TEXT_SSA
+                sub.toString().lowercase().endsWith(".vtt") -> MimeTypes.TEXT_VTT
+                else -> MimeTypes.APPLICATION_SUBRIP
+            }
+            val cfg = MediaItem.SubtitleConfiguration.Builder(sub)
+                .setMimeType(mime)
+                .setLanguage("und")
+                .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                .build()
+            builder.setSubtitleConfigurations(listOf(cfg))
+        }
+        return builder.build()
+    }
+
+    private fun applyExternalSubtitle(sub: Uri) {
+        val p = player ?: run {
+            Toast.makeText(this, "Open a video first", Toast.LENGTH_SHORT).show(); return
+        }
+        val u = currentUri ?: return
+        externalSubUri = sub
+        val pos = p.currentPosition
+        runCatching {
+            p.setMediaItem(buildMediaItemWithSubs(Uri.parse(u), binding.tvFileName.text.toString()), pos)
+            p.prepare(); p.play()
+            Toast.makeText(this, "Subtitle loaded", Toast.LENGTH_SHORT).show()
+        }.onFailure { Toast.makeText(this, "Couldn't load subtitle", Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun showTracksDialog() {
+        val p = player ?: run { Toast.makeText(this, "Open a video first", Toast.LENGTH_SHORT).show(); return }
+        val sel = trackSelector ?: return
+        val groups = p.currentTracks.groups
+
+        data class TrackOpt(val label: String, val group: androidx.media3.common.Tracks.Group?, val index: Int, val type: Int, val off: Boolean = false)
+        val opts = ArrayList<TrackOpt>()
+
+        // Audio tracks
+        groups.filter { it.type == C.TRACK_TYPE_AUDIO }.forEach { g ->
+            for (i in 0 until g.length) {
+                val f = g.getTrackFormat(i)
+                val lang = f.language ?: "audio"
+                val ch = if (f.channelCount > 0) " ${f.channelCount}ch" else ""
+                val sel0 = if (g.isTrackSelected(i)) "  ●" else ""
+                opts.add(TrackOpt("🔊 ${f.label ?: lang}$ch$sel0", g, i, C.TRACK_TYPE_AUDIO))
+            }
+        }
+        // Subtitle off + tracks
+        opts.add(TrackOpt("💬 Subtitles: Off", null, -1, C.TRACK_TYPE_TEXT, off = true))
+        groups.filter { it.type == C.TRACK_TYPE_TEXT }.forEach { g ->
+            for (i in 0 until g.length) {
+                val f = g.getTrackFormat(i)
+                val lang = f.language ?: "sub"
+                val sel0 = if (g.isTrackSelected(i)) "  ●" else ""
+                opts.add(TrackOpt("💬 ${f.label ?: lang}$sel0", g, i, C.TRACK_TYPE_TEXT))
+            }
+        }
+        opts.add(TrackOpt("📂 Load external subtitle (.srt)…", null, -2, C.TRACK_TYPE_TEXT))
+
+        val labels = opts.map { it.label }.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Audio & Subtitles")
+            .setItems(labels) { _, which ->
+                val o = opts[which]
+                when {
+                    o.index == -2 -> subPicker.launch(arrayOf("application/x-subrip", "text/*", "*/*"))
+                    o.off -> sel.setParameters(sel.buildUponParameters().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true))
+                    o.group != null -> runCatching {
+                        sel.setParameters(
+                            sel.buildUponParameters()
+                                .setTrackTypeDisabled(o.type, false)
+                                .setOverrideForType(
+                                    androidx.media3.common.TrackSelectionOverride(o.group.mediaTrackGroup, o.index)
+                                )
+                        )
+                    }
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    // ── Glasses brightness / contrast / IPD ─────────────────────────────────────
+    private fun applyGlassTuning() {
+        glassPresentation?.applyTuning(glassBrightness, glassContrast, ipdShiftPx)
+    }
+
     // ── Player ────────────────────────────────────────────────────────────────
     private fun handleIntent(intent: Intent) {
         if (intent.action == Intent.ACTION_VIEW) intent.data?.let { loadVideo(it) }
@@ -470,6 +602,7 @@ class MainActivity : AppCompatActivity() {
         val fileName = getFileName(uri)
         binding.tvFileName.text = fileName
         currentUri = uri.toString()
+        externalSubUri = null
 
         // Record in recents
         runCatching { prefs.addRecent(uri.toString(), fileName) }
@@ -481,7 +614,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { highlightSbsButton(detected) }
         }
 
-        val newPlayer = ExoPlayer.Builder(this).build()
+        val selector = androidx.media3.exoplayer.trackselection.DefaultTrackSelector(this)
+        trackSelector = selector
+        val newPlayer = ExoPlayer.Builder(this).setTrackSelector(selector).build()
         player = newPlayer
 
         val sessionId = newPlayer.audioSessionId
@@ -501,7 +636,9 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
-        newPlayer.setMediaItem(MediaItem.fromUri(uri))
+        // Look for a sidecar .srt subtitle next to the video and attach it if found
+        val mediaItem = buildMediaItemWithSubs(uri, fileName)
+        newPlayer.setMediaItem(mediaItem)
         newPlayer.prepare()
         newPlayer.setPlaybackSpeed(playbackSpeed)
 
@@ -531,6 +668,7 @@ class MainActivity : AppCompatActivity() {
         glassPresentation = GlassPresentation(this, display, player).also {
             it.show()
             it.applyVideoSettings(currentZoom, currentAspect, currentSbs)
+            it.applyTuning(glassBrightness, glassContrast, ipdShiftPx)
         }
     }
 
@@ -609,7 +747,11 @@ class GlassPresentation(
     // and a SwapSurfaceView reads its bitmap and redraws halves swapped.
     private var swapOverlay: SwapSurfaceView? = null
     private var hiddenTexture: TextureView? = null
+    private var dimOverlay: View? = null
     private var currentSbs = SbsMode.OFF
+    private var pendingBrightness = 1.0f
+    private var pendingContrast = 1.0f
+    private var pendingIpd = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -624,6 +766,18 @@ class GlassPresentation(
         }
         swapOverlay  = findViewById(R.id.swapOverlay)
         hiddenTexture = findViewById(R.id.hiddenTexture)
+        dimOverlay = findViewById(R.id.dimOverlay)
+        applyTuning(pendingBrightness, pendingContrast, pendingIpd)
+    }
+
+    fun applyTuning(brightness: Float, contrast: Float, ipdPx: Int) {
+        pendingBrightness = brightness
+        pendingContrast = contrast
+        pendingIpd = ipdPx
+        // Dim overlay alpha = how much to darken (1 - brightness)
+        dimOverlay?.alpha = (1f - brightness).coerceIn(0f, 0.9f)
+        // Contrast + IPD only affect the swap canvas path
+        swapOverlay?.setTuning(contrast, ipdPx)
     }
 
     fun applyVideoSettings(zoom: ZoomMode, aspect: AspectRatio, sbs: SbsMode) {
@@ -700,6 +854,21 @@ class SwapSurfaceView @JvmOverloads constructor(
     private val dstLeft  = android.graphics.RectF()
     private val dstRight = android.graphics.RectF()
     private var running = false
+    private var ipdShift = 0
+
+    fun setTuning(contrast: Float, ipdPx: Int) {
+        ipdShift = ipdPx
+        // Build a contrast ColorMatrix: scale around mid-gray
+        val c = contrast.coerceIn(0.5f, 2.0f)
+        val t = (0.5f * (1f - c)) * 255f
+        val cm = android.graphics.ColorMatrix(floatArrayOf(
+            c, 0f, 0f, 0f, t,
+            0f, c, 0f, 0f, t,
+            0f, 0f, c, 0f, t,
+            0f, 0f, 0f, 1f, 0f
+        ))
+        paint.colorFilter = if (c == 1.0f) null else android.graphics.ColorMatrixColorFilter(cm)
+    }
 
     fun startSwapping(tv: TextureView, halfWidth: Boolean) {
         source = tv
@@ -735,8 +904,10 @@ class SwapSurfaceView @JvmOverloads constructor(
 
         val dw = width.toFloat()
         val dh = height.toFloat()
-        dstLeft.set(0f, 0f, dw / 2f, dh)         // display left slot  ← gets encoded right
-        dstRight.set(dw / 2f, 0f, dw, dh)         // display right slot ← gets encoded left
+        // IPD: nudge each eye outward (positive) or inward (negative) by ipdShift px
+        val s = ipdShift.toFloat()
+        dstLeft.set(0f - s, 0f, dw / 2f - s, dh)   // display left slot  ← gets encoded right
+        dstRight.set(dw / 2f + s, 0f, dw + s, dh)   // display right slot ← gets encoded left
 
         val canvas = holder.lockCanvas() ?: run {
             bmp.recycle()
